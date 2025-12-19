@@ -104,5 +104,11 @@ class MarketStatusResponse(BaseModel):
 
 
 class UserCreate(BaseModel):
+    balance: Optional[float] = None
+
+
+class UserCreateResponse(BaseModel):
+    user_id: int
     api_key: str
-    balance: Optional[float] = 100000.00
+    balance: float
+    message: str

@@ -16,12 +16,73 @@ from app.schemas import (
     HoldingItem,
     HistoryResponse,
     Candle,
-    MarketStatusResponse
+    MarketStatusResponse,
+    UserCreate,
+    UserCreateResponse
 )
 from app.market_data import MarketDataService
 from app.config import settings
+import secrets
 
 router = APIRouter()
+
+
+@router.post("/register", response_model=UserCreateResponse, tags=["Authentication"])
+async def register_user(
+    user_data: UserCreate = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new trading account and receive an API key.
+
+    No authentication required - this is how you get your first API key!
+
+    **Optional Parameters:**
+    - `balance`: Starting balance (default: $100,000)
+
+    **Returns:**
+    - `user_id`: Your unique user ID
+    - `api_key`: Your API key for authentication (save this!)
+    - `balance`: Your starting balance
+    - `message`: Instructions for using your API key
+
+    **Example Response:**
+    ```json
+    {
+        "user_id": 1,
+        "api_key": "abc123def456...",
+        "balance": 100000.00,
+        "message": "Account created! Use this API key in the 'Authorize' button above."
+    }
+    ```
+    """
+    try:
+        # Generate secure random API key
+        api_key = secrets.token_urlsafe(32)
+
+        # Ensure uniqueness
+        while db.query(User).filter(User.api_key == api_key).first():
+            api_key = secrets.token_urlsafe(32)
+
+        # Set balance
+        balance = user_data.balance if user_data and user_data.balance else settings.DEFAULT_BALANCE
+
+        # Create user
+        user = User(api_key=api_key, balance=balance)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        return UserCreateResponse(
+            user_id=user.id,
+            api_key=api_key,
+            balance=user.balance,
+            message="Account created successfully! Click the 'Authorize' button at the top of this page and paste your API key to start trading."
+        )
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error creating user: {str(e)}")
 
 
 # Resolution mapping for normalization
